@@ -1,0 +1,18 @@
+services:
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8090:8080
+  dbMysql:
+    image: mariadb:10.7
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: "06082026"
+      MYSQL_DATABASE: usersDB
+      MYSQL_USER: vlakov
+      MYSQL_PASSWORD: "06082026"
+    volumes:
+      - './_mysql/:/docker-entrypoint-initdb.d/'
