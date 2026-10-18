@@ -363,7 +363,7 @@ func TestGetMethReleasesConnection(t *testing.T) {
 	db := sql.OpenDB(&getTestConnector{rows: rows, query: "SHOW TABLES"})
 	t.Cleanup(func() { db.Close() })
 
-	if _, err := getMeth(db, "", ""); err != nil {
+	if _, err := getMeth(db, "", "", 5, 0); err != nil {
 		t.Fatal(err)
 	}
 	stats := db.Stats()

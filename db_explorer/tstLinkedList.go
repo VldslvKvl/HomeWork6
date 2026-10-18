@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/big"
 	"slices"
 	"strconv"
@@ -74,9 +73,10 @@ func reverseListFinal(arr []int) *ListNode {
 	}
 	return &finalArr
 }
-func main() {
+
+/*func main() {
 	l1 := &ListNode{1, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{0, &ListNode{1, nil}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
 	l2 := &ListNode{5, &ListNode{6, &ListNode{4, nil}}}
 	r := addTwoNumbers(l1, l2)
 	fmt.Println(r)
-}
+}*/
