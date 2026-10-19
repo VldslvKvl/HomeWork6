@@ -90,11 +90,8 @@ func tableColumns(db *sql.DB, foldName string) ([]map[string]string, error) {
 	}
 	return fields, rows.Err()
 }
-func colList(db *sql.DB, foldName string) (string, error) {
-	fields, err := tableColumns(db, foldName)
-	if err != nil {
-		return "", err
-	}
+func colList(colL []map[string]string) (string, error) {
+	fields := colL
 	for _, field := range fields {
 		if field["Key"] == "PRI" {
 			return field["Field"], nil
@@ -102,7 +99,7 @@ func colList(db *sql.DB, foldName string) (string, error) {
 	}
 	return "", fmt.Errorf("primary key not found")
 }
-func getMeth(db *sql.DB, foldName, id string, limit int, offset int) (map[string]interface{}, error) {
+func getMeth(db *sql.DB, foldName string, id string, limit int, offset int, colL []map[string]string) (map[string]interface{}, error) {
 	resultList := make(map[string]interface{})
 	query := fmt.Sprintf("SELECT * FROM `%s` LIMIT ? OFFSET ?", strings.ReplaceAll(foldName, "`", "``"))
 	var args []interface{}
@@ -113,7 +110,7 @@ func getMeth(db *sql.DB, foldName, id string, limit int, offset int) (map[string
 		if err != nil {
 			return nil, err
 		}
-		fName, err := colList(db, foldName)
+		fName, err := colList(colL)
 		if err != nil {
 			return nil, err
 		}
@@ -126,12 +123,12 @@ func getMeth(db *sql.DB, foldName, id string, limit int, offset int) (map[string
 		return nil, err
 	}
 	defer res.Close()
-	colL, err := res.Columns()
+	colLs, err := res.Columns()
 	if err != nil {
 		return nil, err
 	}
-	rL := make([]interface{}, len(colL))
-	values := make([]interface{}, len(colL))
+	rL := make([]interface{}, len(colLs))
+	values := make([]interface{}, len(colLs))
 	for i := range rL {
 		rL[i] = &values[i]
 	}
@@ -141,7 +138,7 @@ func getMeth(db *sql.DB, foldName, id string, limit int, offset int) (map[string
 			return nil, err
 		}
 		record := make(map[string]interface{}, len(colL))
-		for i, column := range colL {
+		for i, column := range colLs {
 			value := values[i]
 			if bytes, ok := value.([]byte); ok {
 				value = string(bytes)
@@ -163,7 +160,7 @@ func getMeth(db *sql.DB, foldName, id string, limit int, offset int) (map[string
 	}
 	return resultList, nil
 }
-func putMeth(db *sql.DB, foldName, id string, r *http.Request) (map[string]interface{}, error) {
+func putMeth(db *sql.DB, foldName string, r *http.Request, colL []map[string]string) (map[string]interface{}, error) {
 	var bod map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&bod); err != nil {
 		return nil, err
@@ -171,10 +168,7 @@ func putMeth(db *sql.DB, foldName, id string, r *http.Request) (map[string]inter
 	if len(bod) == 0 {
 		return nil, fmt.Errorf("empty body")
 	}
-	fields, err := tableColumns(db, foldName)
-	if err != nil {
-		return nil, err
-	}
+	fields := colL
 	fName := ""
 	columns := make([]string, 0, len(bod))
 	placeholders := make([]string, 0, len(bod))
@@ -222,11 +216,8 @@ func putMeth(db *sql.DB, foldName, id string, r *http.Request) (map[string]inter
 	}
 	return map[string]interface{}{fName: newID}, nil
 }
-func validateUpdate(db *sql.DB, foldName string, bod map[string]interface{}) (string, error) {
-	fields, err := tableColumns(db, foldName)
-	if err != nil {
-		return "", err
-	}
+func validateUpdate(db *sql.DB, foldName string, bod map[string]interface{}, colL []map[string]string) (string, error) {
+	fields := colL
 	primaryKey := ""
 	for _, field := range fields {
 		if field["Key"] == "PRI" {
@@ -257,7 +248,7 @@ func validateUpdate(db *sql.DB, foldName string, bod map[string]interface{}) (st
 	}
 	return primaryKey, nil
 }
-func postMeth(db *sql.DB, foldName, id string, r *http.Request) (map[string]interface{}, error) {
+func postMeth(db *sql.DB, foldName string, id string, r *http.Request, colL []map[string]string) (map[string]interface{}, error) {
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, err
@@ -269,7 +260,7 @@ func postMeth(db *sql.DB, foldName, id string, r *http.Request) (map[string]inte
 	if len(bod) == 0 {
 		return nil, fmt.Errorf("empty body")
 	}
-	fName, err := validateUpdate(db, foldName, bod)
+	fName, err := validateUpdate(db, foldName, bod, colL)
 	if err != nil {
 		return nil, err
 	}
@@ -293,12 +284,12 @@ func postMeth(db *sql.DB, foldName, id string, r *http.Request) (map[string]inte
 	}
 	return map[string]interface{}{"updated": updated}, nil
 }
-func deleteMeth(db *sql.DB, foldName, id string) (map[string]interface{}, error) {
+func deleteMeth(db *sql.DB, foldName string, id string, colL []map[string]string) (map[string]interface{}, error) {
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, err
 	}
-	fName, err := colList(db, foldName)
+	fName, err := colList(colL)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +305,7 @@ func deleteMeth(db *sql.DB, foldName, id string) (map[string]interface{}, error)
 	}
 	return map[string]interface{}{"deleted": deleted}, nil
 }
-func dataBaseSearcher(db *sql.DB, tableList []interface{}, err error) func(http.ResponseWriter, *http.Request) {
+func dataBaseSearcher(db *sql.DB, tableList []interface{}, colL map[string][]map[string]string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		response := make(map[string]interface{})
 		var queryErr error
@@ -325,13 +316,13 @@ func dataBaseSearcher(db *sql.DB, tableList []interface{}, err error) func(http.
 				response["tables"] = tableList
 				break
 			}
-			response, queryErr = getMeth(db, foldName, id, limit, offset)
+			response, queryErr = getMeth(db, foldName, id, limit, offset, colL[foldName])
 		case http.MethodPut:
-			response, queryErr = putMeth(db, foldName, id, r)
+			response, queryErr = putMeth(db, foldName, r, colL[foldName])
 		case http.MethodPost:
-			response, queryErr = postMeth(db, foldName, id, r)
+			response, queryErr = postMeth(db, foldName, id, r, colL[foldName])
 		case http.MethodDelete:
-			response, queryErr = deleteMeth(db, foldName, id)
+			response, queryErr = deleteMeth(db, foldName, id, colL[foldName])
 		}
 		if queryErr != nil {
 			w.Header().Set("Content-Type", "application/json")
@@ -358,26 +349,44 @@ func responceWriter(w http.ResponseWriter, response map[string]interface{}, id s
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(resultResp)
 }
-func dbAttributeScanner(db *sql.DB) ([]interface{}, error) {
+func dbAttributeScanner(db *sql.DB) ([]interface{}, map[string][]map[string]string, error) {
 	var tL string
 	tablesList := []interface{}{}
+	tabCol := map[string][]map[string]string{}
 	rws, err := db.Query("SHOW TABLES")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rws.Close()
 	for rws.Next() {
 		if err := rws.Scan(&tL); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		tablesList = append(tablesList, tL)
 	}
-	return tablesList, rws.Err()
+	if err := rws.Err(); err != nil {
+		return nil, nil, err
+	}
+	if err := rws.Close(); err != nil {
+		return nil, nil, err
+	}
+	for _, table := range tablesList {
+		name := table.(string)
+		columns, err := tableColumns(db, name)
+		if err != nil {
+			return nil, nil, err
+		}
+		tabCol[name] = columns
+	}
+	return tablesList, tabCol, nil
 }
 func NewDbExplorer(db *sql.DB) (http.Handler, error) {
-	tablesList, err := dbAttributeScanner(db)
+	tablesList, colL, err := dbAttributeScanner(db)
+	if err != nil {
+		return nil, err
+	}
 	handler := http.NewServeMux()
-	searcher := dataBaseSearcher(db, tablesList, err)
+	searcher := dataBaseSearcher(db, tablesList, colL)
 	handler.HandleFunc("/{$}", searcher)
 	handler.HandleFunc("/items/", searcher)
 	handler.HandleFunc("/users/", searcher)
